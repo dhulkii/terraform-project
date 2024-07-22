@@ -182,9 +182,4 @@ resource "aws_lb_listener_rule" "rule-2" {
     type             = "forward"
     target_group_arn = aws_lb_target_group.TG2.arn
   }
-  condition {
-    path_pattern {
-      values = ["/kider/*"]
-    }
-  }
-}
+  
