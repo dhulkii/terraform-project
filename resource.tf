@@ -101,4 +101,90 @@ resource "aws_security_group" "alb-sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+resource "aws_instance" "ec2-1" {
+  ami                    = var.ami
+  instance_type          = var.instance_type
+  vpc_security_group_ids = [aws_security_group.web-Sg.id]
+  subnet_id              = aws_subnet.public-1.id
+  key_name               = var.key_name
+  tags = {
+    Name = "we-app-guarder"
+  }
+}
+resource "aws_instance" "ec2-2" {
+  ami                    = var.ami
+  instance_type          = var.instance_type
+  vpc_security_group_ids = [aws_security_group.web-Sg.id]
+  subnet_id              = aws_subnet.public-2.id
+  key_name               = var.key_name
+  tags = {
+    Name = "web-app-kider"
+  }
+}
+resource "aws_lb_target_group" "TG1" {
+  target_type = "instance"
+  name     = "TG-1"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.myvpc.id
+}
+resource "aws_lb_target_group" "TG2" {
+  name     = "TG-2"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.myvpc.id
+}
 
+
+resource "aws_lb_target_group_attachment" "TG-1-attach" {
+  target_group_arn = aws_lb_target_group.TG1.arn
+  target_id        = aws_instance.ec2-1.id
+  port             = 80
+}
+resource "aws_lb_target_group_attachment" "TG-2-attach" {
+  target_group_arn = aws_lb_target_group.TG2.arn
+  target_id        = aws_instance.ec2-2.id
+  port             = 80
+}
+resource "aws_lb" "LB" {
+  name               = "dk-lb-tf"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb-sg.id]
+  subnets            = [aws_subnet.public-1.id, aws_subnet.public-2.id]
+}
+resource "aws_lb_listener" "listener-default" {
+  load_balancer_arn = aws_lb.LB.arn
+  port              = "80"
+  protocol          = "HTTP"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.TG1.arn
+    }
+}
+resource "aws_lb_listener_rule" "rule-1" {
+  listener_arn = aws_lb_listener.listener-default.arn
+  priority     = 1
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.TG1.arn
+  }
+  condition {
+    path_pattern {
+      values = ["/guarder/*"]
+    }
+  }
+}
+resource "aws_lb_listener_rule" "rule-2" {
+  listener_arn = aws_lb_listener.listener-default.arn
+  priority     = 2
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.TG2.arn
+  }
+  condition {
+    path_pattern {
+      values = ["/kider/*"]
+    }
+  }
+}
